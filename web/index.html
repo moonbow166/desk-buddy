@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Desk Buddy</title>
+  <script src="https://cdn.jsdelivr.net/npm/abcjs@6.4.4/dist/abcjs-basic-min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap');
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #1a1a2e;
+      color: #e0d6c8;
+      font-family: 'Nunito', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    #app {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding: 24px;
+    }
+
+    #main-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 20px;
+    }
+
+    /* Speech bubble */
+    #speech-bubble {
+      background: #2e2a1e;
+      border: 2px solid #daa550;
+      border-radius: 16px;
+      padding: 12px 20px;
+      max-width: 420px;
+      text-align: center;
+      font-size: 15px;
+      line-height: 1.5;
+      color: #f0e6d2;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+      pointer-events: none;
+      min-height: 0;
+    }
+
+    #speech-bubble.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    #speech-bubble::after {
+      content: '';
+      position: absolute;
+      bottom: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 10px solid transparent;
+      border-right: 10px solid transparent;
+      border-top: 10px solid #daa550;
+    }
+
+    /* Canvas area */
+    #canvas-wrapper {
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(218, 165, 80, 0.15);
+    }
+
+    #buddy-canvas {
+      display: block;
+      width: 512px;
+      height: 512px;
+      image-rendering: pixelated;
+      background: #16213e;
+      border-radius: 12px;
+    }
+
+    /* Chat log */
+    #chat-log {
+      width: 512px;
+      max-height: 120px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 8px 12px;
+      background: #16213e;
+      border-radius: 12px;
+      scrollbar-width: thin;
+      scrollbar-color: #3a3528 transparent;
+    }
+
+    #chat-log:empty {
+      display: none;
+    }
+
+    .chat-msg {
+      font-size: 13px;
+      color: #a89880;
+      line-height: 1.4;
+    }
+
+    .chat-msg .chat-time {
+      color: #555;
+      margin-right: 6px;
+      font-size: 11px;
+    }
+
+    .chat-msg .chat-text {
+      color: #e0d6c8;
+    }
+
+    /* Mood indicator */
+    #mood-text {
+      font-size: 14px;
+      color: #a89880;
+      letter-spacing: 0.5px;
+    }
+
+    /* Status bar */
+    #status-bar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 13px;
+      color: #7a7060;
+      padding: 6px 16px;
+      background: #16213e;
+      border-radius: 20px;
+    }
+
+    #status-bar .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #555;
+      display: inline-block;
+    }
+
+    #status-bar .dot.connected {
+      background: #daa550;
+      box-shadow: 0 0 6px #daa550;
+    }
+
+    /* Buttons */
+    #save-btn {
+      background: none;
+      border: none;
+      color: #7a7060;
+      font-family: 'Nunito', sans-serif;
+      font-size: 13px;
+      padding: 0;
+      cursor: pointer;
+      transition: color 0.2s ease;
+    }
+
+    #save-btn:hover {
+      color: #daa550;
+    }
+
+    #replay-btn {
+      background: none;
+      border: 1px solid #3a3528;
+      color: #a89880;
+      font-family: 'Nunito', sans-serif;
+      font-size: 13px;
+      padding: 6px 16px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    #replay-btn:hover {
+      border-color: #daa550;
+      color: #daa550;
+    }
+
+    /* Music section */
+    #music-section {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      width: 320px;
+    }
+
+    #music-section.visible {
+      display: flex;
+    }
+
+    #music-label {
+      font-size: 13px;
+      color: #daa550;
+      letter-spacing: 0.3px;
+    }
+
+    #music-render {
+      background: #f5f0e8;
+      border-radius: 8px;
+      padding: 16px;
+      width: 100%;
+    }
+
+    /* Pomodoro panel */
+    #pomo-panel {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 24px;
+      background: #16213e;
+      border-radius: 12px;
+      width: 512px;
+    }
+
+    #pomo-panel.active {
+      display: flex;
+    }
+
+    #pomo-time {
+      font-size: 52px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 4px;
+    }
+
+    #pomo-time.focus { color: #dc5040; }
+    #pomo-time.break { color: #50c878; }
+
+    #pomo-label {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+
+    #pomo-label.focus { color: #dc5040; }
+    #pomo-label.break { color: #50c878; }
+
+    #pomo-progress-bar {
+      width: 100%;
+      height: 6px;
+      background: #2a2a3e;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    #pomo-progress-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 1s linear;
+    }
+
+    #pomo-progress-fill.focus { background: #dc5040; }
+    #pomo-progress-fill.break { background: #50c878; }
+
+    /* Pomo controls */
+    #pomo-controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-top: 4px;
+    }
+
+    .pomo-btn {
+      background: #2a2a3e;
+      color: #ccc;
+      border: 1px solid #444;
+      border-radius: 8px;
+      padding: 6px 18px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .pomo-btn:hover {
+      background: #3a3a5e;
+      color: #fff;
+    }
+
+    .pomo-btn.start { border-color: #dc5040; color: #dc5040; }
+    .pomo-btn.start:hover { background: #dc5040; color: #fff; }
+
+    .pomo-btn.stop { border-color: #888; color: #888; }
+    .pomo-btn.stop:hover { background: #555; color: #fff; }
+
+    #pomo-starter {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 24px;
+      background: #16213e;
+      border-radius: 12px;
+      width: 512px;
+    }
+
+    #pomo-starter-label {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      color: #888;
+    }
+
+    /* Reconnect notice */
+    #reconnect-notice {
+      position: fixed;
+      bottom: 16px;
+      right: 16px;
+      font-size: 12px;
+      color: #7a7060;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    #reconnect-notice.visible {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="speech-bubble"></div>
+
+    <div id="main-row">
+      <div id="canvas-wrapper">
+        <canvas id="buddy-canvas" width="64" height="64"></canvas>
+      </div>
+
+      <div id="music-section">
+        <span id="music-label">&#9835; Buddy composed a song for you</span>
+        <div id="music-render"></div>
+        <button id="replay-btn">&#9654; Play Again</button>
+      </div>
+    </div>
+
+    <div id="pomo-starter">
+      <span id="pomo-starter-label">Pomodoro Timer</span>
+      <div id="pomo-controls">
+        <button class="pomo-btn start" id="pomo-start-btn">&#9654; Start Focus</button>
+      </div>
+    </div>
+
+    <div id="pomo-panel">
+      <span id="pomo-label">FOCUS</span>
+      <span id="pomo-time" class="focus">25:00</span>
+      <div id="pomo-progress-bar">
+        <div id="pomo-progress-fill" class="focus" style="width: 0%"></div>
+      </div>
+      <div id="pomo-controls">
+        <button class="pomo-btn stop" id="pomo-stop-btn">&#9632; Stop</button>
+      </div>
+    </div>
+
+    <div id="chat-log"></div>
+
+    <div id="mood-text">waiting for buddy...</div>
+
+    <div id="status-bar">
+      <span class="dot" id="conn-dot"></span>
+      <span id="buddy-name">Desk Buddy</span>
+      <span>&middot;</span>
+      <span id="period-text">--</span>
+      <span>&middot;</span>
+      <button id="save-btn">Save as PNG</button>
+    </div>
+
+    <audio id="voice-player" preload="auto"></audio>
+  </div>
+
+  <div id="reconnect-notice">reconnecting...</div>
+
+  <script>
+    // ---- Elements ----
+    const canvas = document.getElementById('buddy-canvas');
+    const ctx = canvas.getContext('2d');
+    const moodText = document.getElementById('mood-text');
+    const speechBubble = document.getElementById('speech-bubble');
+    const buddyName = document.getElementById('buddy-name');
+    const periodText = document.getElementById('period-text');
+    const connDot = document.getElementById('conn-dot');
+    const voicePlayer = document.getElementById('voice-player');
+    const musicSection = document.getElementById('music-section');
+    const musicRender = document.getElementById('music-render');
+    const saveBtn = document.getElementById('save-btn');
+    const replayBtn = document.getElementById('replay-btn');
+    const chatLog = document.getElementById('chat-log');
+    const reconnectNotice = document.getElementById('reconnect-notice');
+    const pomoPanel = document.getElementById('pomo-panel');
+    const pomoTime = document.getElementById('pomo-time');
+    const pomoLabel = document.getElementById('pomo-label');
+    const pomoFill = document.getElementById('pomo-progress-fill');
+    const pomoStarter = document.getElementById('pomo-starter');
+    const pomoStartBtn = document.getElementById('pomo-start-btn');
+    const pomoStopBtn = document.getElementById('pomo-stop-btn');
+
+    // ---- State ----
+    let ws = null;
+    let animationTimer = null;
+    let speechTimer = null;
+    let synthControl = null;
+    let lastAbc = null;
+
+    // ---- Canvas rendering ----
+    // Scale the canvas element for display while keeping 64x64 internal resolution
+    canvas.style.width = '512px';
+    canvas.style.height = '512px';
+
+    function drawSprite(pixels) {
+      // pixels: flat array of [r, g, b] for each of the 64x64 pixels
+      const imageData = ctx.createImageData(64, 64);
+      for (let i = 0; i < pixels.length && i < 4096; i++) {
+        const px = pixels[i];
+        const offset = i * 4;
+        imageData.data[offset]     = px[0]; // R
+        imageData.data[offset + 1] = px[1]; // G
+        imageData.data[offset + 2] = px[2]; // B
+        imageData.data[offset + 3] = 255;   // A
+      }
+      ctx.putImageData(imageData, 0, 0);
+    }
+
+    function stopAnimation() {
+      if (animationTimer !== null) {
+        clearInterval(animationTimer);
+        animationTimer = null;
+      }
+    }
+
+    function startAnimation(frames, speed) {
+      stopAnimation();
+      if (!frames || frames.length === 0) return;
+
+      let index = 0;
+      drawSprite(frames[0]);
+      if (frames.length === 1) return;
+
+      animationTimer = setInterval(() => {
+        index = (index + 1) % frames.length;
+        drawSprite(frames[index]);
+      }, speed);
+    }
+
+    // ---- Speech bubble ----
+    function showSpeech(text) {
+      if (speechTimer) clearTimeout(speechTimer);
+      speechBubble.textContent = text;
+      speechBubble.classList.add('visible');
+      speechTimer = setTimeout(() => {
+        speechBubble.classList.remove('visible');
+      }, 8000);
+
+      // Add to chat log
+      const msg = document.createElement('div');
+      msg.className = 'chat-msg';
+      const now = new Date();
+      const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+      msg.innerHTML = '<span class="chat-time">' + timeStr + '</span><span class="chat-text">' + text + '</span>';
+      chatLog.appendChild(msg);
+      chatLog.scrollTop = chatLog.scrollHeight;
+    }
+
+    // ---- Voice playback ----
+    let audioUnlocked = false;
+
+    // Unlock audio context on first user interaction
+    document.addEventListener('click', () => {
+      if (!audioUnlocked) {
+        audioUnlocked = true;
+        // Play a silent buffer to unlock the audio pipeline
+        voicePlayer.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAABhgC7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAABhgFCMscAAAAAAAAAAAAAAAAAAAAAAAAAAAD/+0DEAAAALDSAAAAAAAA0gAAAAAT//tAxAAAASgsAAAAAAAANIAAAABP/7QMQAAAALDSAAAAAAAA0gAAAAA';
+        voicePlayer.play().catch(() => {});
+      }
+    }, { once: true });
+
+    function playVoice(audioB64) {
+      const byteChars = atob(audioB64);
+      const byteArray = new Uint8Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) {
+        byteArray[i] = byteChars.charCodeAt(i);
+      }
+      const blob = new Blob([byteArray], { type: 'audio/mpeg' });
+      const url = URL.createObjectURL(blob);
+      voicePlayer.src = url;
+      voicePlayer.play().catch(() => {
+        // Autoplay blocked — show a manual play button
+        console.warn('Autoplay blocked, showing play button');
+        let btn = document.getElementById('voice-play-btn');
+        if (!btn) {
+          btn = document.createElement('button');
+          btn.id = 'voice-play-btn';
+          btn.textContent = '🔊 Play Voice';
+          btn.style.cssText = 'position:fixed;bottom:20px;right:20px;padding:12px 20px;font-size:16px;background:#ff9800;color:#fff;border:none;border-radius:8px;cursor:pointer;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,0.3);';
+          btn.onclick = () => {
+            voicePlayer.play();
+            btn.remove();
+            audioUnlocked = true;
+          };
+          document.body.appendChild(btn);
+        }
+      });
+    }
+
+    // ---- ABC Music ----
+    function renderMusic(abc) {
+      lastAbc = abc;
+      musicSection.classList.add('visible');
+      ABCJS.renderAbc('music-render', abc, {
+        responsive: 'resize',
+        staffwidth: 460
+      });
+
+      // Attempt to play using ABCJS synth
+      if (ABCJS.synth && ABCJS.synth.supportsAudio()) {
+        if (synthControl) {
+          synthControl.stop();
+        }
+        const visualObj = ABCJS.renderAbc('music-render', abc, {
+          responsive: 'resize',
+          staffwidth: 460
+        })[0];
+
+        synthControl = new ABCJS.synth.CreateSynth();
+        synthControl.init({
+          visualObj: visualObj,
+          options: { soundFontUrl: 'https://paulrosen.github.io/midi-js-soundfonts/FluidR3_GM/' }
+        }).then(() => {
+          return synthControl.prime();
+        }).then(() => {
+          synthControl.start();
+        }).catch(() => {
+          // Synth playback not available
+        });
+      }
+    }
+
+    // ---- Save as PNG ----
+    saveBtn.addEventListener('click', () => {
+      // Create a scaled-up canvas for a nicer PNG
+      const outCanvas = document.createElement('canvas');
+      outCanvas.width = 512;
+      outCanvas.height = 512;
+      const outCtx = outCanvas.getContext('2d');
+      outCtx.imageSmoothingEnabled = false;
+      outCtx.drawImage(canvas, 0, 0, 512, 512);
+
+      const link = document.createElement('a');
+      link.download = 'desk-buddy.png';
+      link.href = outCanvas.toDataURL('image/png');
+      link.click();
+    });
+
+    // ---- Replay music ----
+    replayBtn.addEventListener('click', () => {
+      if (lastAbc) renderMusic(lastAbc);
+    });
+
+    // ---- WebSocket ----
+    function connect() {
+      ws = new WebSocket('ws://localhost:3457');
+
+      ws.addEventListener('open', () => {
+        connDot.classList.add('connected');
+        reconnectNotice.classList.remove('visible');
+      });
+
+      ws.addEventListener('close', () => {
+        connDot.classList.remove('connected');
+        reconnectNotice.classList.add('visible');
+        setTimeout(connect, 3000);
+      });
+
+      ws.addEventListener('error', () => {
+        ws.close();
+      });
+
+      ws.addEventListener('message', (event) => {
+        let msg;
+        try {
+          msg = JSON.parse(event.data);
+        } catch {
+          return;
+        }
+
+        switch (msg.type) {
+          case 'mood':
+            stopAnimation();
+            if (msg.sprite) drawSprite(msg.sprite);
+            if (msg.mood) moodText.textContent = msg.mood;
+            break;
+
+          case 'animation':
+            startAnimation(msg.frames, msg.speed || 500);
+            break;
+
+          case 'voice':
+            if (msg.audio_b64) playVoice(msg.audio_b64);
+            break;
+
+          case 'music':
+            if (msg.abc) renderMusic(msg.abc);
+            break;
+
+          case 'say':
+            if (msg.text) showSpeech(msg.text);
+            break;
+
+          case 'status':
+            if (msg.mood) moodText.textContent = msg.mood;
+            if (msg.period) periodText.textContent = msg.period;
+            break;
+
+          case 'pomo':
+            handlePomo(msg);
+            break;
+        }
+      });
+    }
+
+    // ---- Pomodoro handler (local countdown for smooth display) ----
+    let pomoLocal = { active: false, phase: 'focus', remaining: 0, total: 0 };
+    let pomoInterval = null;
+
+    function pomoTick() {
+      if (!pomoLocal.active || pomoLocal.remaining <= 0) return;
+      pomoLocal.remaining = Math.max(0, pomoLocal.remaining - 1);
+      renderPomo();
+    }
+
+    function renderPomo() {
+      const { phase, remaining, total } = pomoLocal;
+      const mins = Math.floor(remaining / 60);
+      const secs = remaining % 60;
+
+      pomoTime.textContent = String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+      pomoTime.className = phase;
+      pomoLabel.textContent = phase === 'focus' ? 'FOCUS' : 'BREAK';
+      pomoLabel.className = phase;
+      pomoFill.className = phase;
+
+      const progress = total > 0 ? ((total - remaining) / total * 100) : 0;
+      pomoFill.style.width = progress + '%';
+    }
+
+    function handlePomo(msg) {
+      if (!msg.active) {
+        pomoLocal.active = false;
+        pomoPanel.classList.remove('active');
+        pomoStarter.style.display = 'flex';
+        if (pomoInterval) { clearInterval(pomoInterval); pomoInterval = null; }
+        return;
+      }
+
+      // Sync from server (corrects any drift)
+      pomoLocal.active = true;
+      pomoLocal.phase = msg.phase;
+      pomoLocal.remaining = msg.remaining;
+      pomoLocal.total = msg.total;
+
+      pomoStarter.style.display = 'none';
+      pomoPanel.classList.add('active');
+      renderPomo();
+
+      // Start local tick if not already running
+      if (!pomoInterval) {
+        pomoInterval = setInterval(pomoTick, 1000);
+      }
+    }
+
+    // ---- Pomo buttons ----
+    function wsSend(obj) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(obj));
+      }
+    }
+
+    pomoStartBtn.addEventListener('click', () => {
+      wsSend({ command: 'pomo_start', duration: 25, break_duration: 5 });
+    });
+
+    pomoStopBtn.addEventListener('click', () => {
+      wsSend({ command: 'pomo_stop' });
+    });
+
+    // ---- Secret hotkeys (for demo) ----
+    document.addEventListener('keydown', (e) => {
+      // Ctrl+M (or Cmd+M on Mac) → trigger compose
+      if ((e.ctrlKey || e.metaKey) && e.key === 'm') {
+        e.preventDefault();
+        wsSend({ command: 'compose' });
+      }
+    });
+
+    // Start connection
+    connect();
+  </script>
+</body>
+</html>

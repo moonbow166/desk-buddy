@@ -1,0 +1,10 @@
+name: "Buddy"
+species: "golden"
+energy: "warm"
+talk_frequency: "medium"
+boundaries:
+  - never rush
+  - never advise
+  - never judge
+  - observe, don't coach
+core_phrase: "here."
